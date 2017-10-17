@@ -1,0 +1,193 @@
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver import ActionChains
+from selenium.webdriver.support import expected_conditions as EC
+
+import time
+import sys
+from bs4 import BeautifulSoup
+
+
+class webBrowse:
+	def __init__(self):
+		self.driver = webdriver.Firefox()
+		return
+		
+	def __del__(self):
+		if self.driver:
+			self.driver.quit()
+		return
+		
+	def zhihu_login(self):	
+		print 'loading zhihu.com'
+		
+		self.driver.get("https://www.zhihu.com/")
+		
+		try:
+			self.driver.find_element_by_xpath("//a[contains(@href,'signin')]").click()
+			
+			self.driver.find_element_by_xpath("//div[contains(@class,'qrcode-signin-cut-button')]").click()
+			
+			email = self.driver.find_element_by_xpath("//input[@name='account']")
+
+			email.clear()
+
+			email.send_keys("youname@163.com")
+			
+			
+			password = self.driver.find_element_by_xpath("//input[@name='password']")
+
+			password.clear()
+
+			password.send_keys("******")
+			
+			self.driver.find_element_by_xpath("//button[contains(@class,'sign-button submit')]").click()
+			
+			
+			print 'wait 60 second to login zhizhu'
+			wait = WebDriverWait(self.driver, 60).until(lambda driver: driver.find_element_by_xpath("//button[contains(@class,'Button PushNotifications-icon Button--plain')]"))
+			print 'personal first page login success'
+
+		except:
+			print 'login error to exit'
+			exit()
+			pass
+		
+		return
+		#self.driver.find_element_by_xpath("//button[contains(@class,'Button PushNotifications-icon Button--plain')]").click()	
+		#self.driver.find_element_by_xpath("//button[contains(@class,'Button PushNotifications-icon Button--plain')]").click()
+		
+	def get_following_number(self,url):
+		
+		self.driver.get(url)
+		totalMem = 0
+	
+		html = self.driver.page_source
+		#print html
+		soup = BeautifulSoup(html, 'html.parser')
+		
+		tag = soup.find('a',attrs={"class":"Button NumberBoard-item Button--plain"})
+		
+		if 'following' in str(tag):
+			item = tag.find('div',attrs={"class":"NumberBoard-value"})
+			totalMem = int(item.get_text())
+
+		print 'total following %d'%totalMem
+		return totalMem
+		
+	def get_followers_number(self,url):
+		
+		self.driver.get(url)
+		totalMem = 0
+	
+		html = self.driver.page_source
+		#print html
+		soup = BeautifulSoup(html, 'html.parser')
+
+		tag = soup.find('a',attrs={"class":"Button NumberBoard-item Button--plain"})
+		next_tag = tag.find_next('a',attrs={"class":"Button NumberBoard-item Button--plain"})
+		
+		if 'followers' in str(next_tag):
+			item = next_tag.find('div',attrs={"class":"NumberBoard-value"})
+			totalMem = int(item.get_text())
+
+		print 'total followers %d'%totalMem
+		return totalMem
+		
+	def get_members(self,url,number):
+		
+		dict_list = {}
+		key = ('name','href','image')
+		
+		page = number/20
+		for i in range(1,page+2):
+			url_follow = ("%s%s%s")%(url,'?page=',i)
+			self.driver.get(url_follow)
+			html = self.driver.page_source
+			soup = BeautifulSoup(html, 'html.parser')
+			tag = soup.find_all('div',attrs={"class":"List-item"})
+			for i in tag:
+				try:
+					name_div = i.find('div',attrs={"class":"ContentItem-head"})
+					name = name_div.find('a',attrs={"class":"UserLink-link"})			
+					image_div = i.find('div',attrs={"class":"ContentItem-image"})
+					image = image_div.find('img')
+					
+					print '&&&&&&&&&&&&&&&&&&&&&&'
+					print name.get_text()
+					print name.get('href')
+					print image.get('src')
+					print '&&&&&&&&&&&&&&&&&&&&&&'
+					
+				except:
+					continue
+				dict = {}
+				dict = dict.fromkeys(key)
+				dict['name'] = name.get_text() 
+				dict['href'] = name.get('href')
+				dict['image'] = image.get('src')
+				dict_list[name.get_text() ]= dict
+			
+		return dict_list
+		
+	def get_following(self,url):	
+		following_url = "%s%s"%(url,'/following')
+		following_num = self.get_following_number(following_url)
+		dict_list = self.get_members(following_url,following_num)
+		return dict_list
+	
+	def get_follower(self,url):	
+		follower_url = "%s%s"%(url,'/followers')
+		follower_num = self.get_followers_number(follower_url)
+		dict_list = self.get_members(follower_url,follower_num)
+		return dict_list
+	
+	def repeat_get_following(self,url,deep):	
+		result_list = {}
+		dict_list = self.get_following(url)
+		result_list = dict(result_list, **dict_list)
+		pre_dict_list = dict_list.copy()
+		deep = deep - 1
+		while(deep > 0):
+			next_dict_list = {}
+			for i in pre_dict_list.keys():
+				temp_url = ("%s%s")%('https://www.zhihu.com',dict_list[i]['href'].encode('ascii'))
+				print temp_url
+				tmp_dict_list = self.get_following(temp_url)
+				next_dict_list = dict(next_dict_list, **tmp_dict_list)
+				if len(next_dict_list) > 1000:
+					break
+			
+			result_list = dict(result_list, **next_dict_list)
+			if len(result_list) > 1000:
+				break
+			pre_dict_list = next_dict_list.copy()
+			deep = deep - 1
+		
+		
+
+		return result_list
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+	
+	
+	
+			
